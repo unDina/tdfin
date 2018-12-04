@@ -45,7 +45,8 @@ for i, account in enumerate(data["account"]):
         if transaction["outcomeAccount"] == account["id"]:
             transaction["outcomeAccount"] = newid
     account["id"] = newid
-    account["user"] = userid  # для тестовой базы
+    if userid:
+        account["user"] = userid  # меняет userid для тестовой базы
     if account["type"] == "debt": debtid = i
 
 if debtid is not None:
@@ -62,7 +63,8 @@ for tag in data["tag"]:
         if child_tag["parent"] == tag["id"]:
             child_tag["parent"] = newid
     tag["id"] = newid
-    tag["user"] = userid # для тестовой базы
+    if userid:
+        tag["user"] = userid # меняет userid для тестовой базы
 
 for merchant in data["merchant"]:
     newid = str(uuid.uuid4())
@@ -70,11 +72,13 @@ for merchant in data["merchant"]:
         if transaction["merchant"] == merchant["id"]:
             transaction["merchant"] = newid
     merchant["id"] = newid
-    merchant["user"] = userid # для тестовой базы
+    if userid:
+        merchant["user"] = userid # меняет userid для тестовой базы
 
 for transaction in data["transaction"]:
     transaction["id"] = str(uuid.uuid4())
-    transaction["user"] = userid # для тестовой базы
+    if userid:
+        transaction["user"] = userid # меняет userid для тестовой базы
 
 
 # удаляем из дампа неизменяемые сущности
