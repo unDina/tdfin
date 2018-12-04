@@ -22,14 +22,14 @@ merchdict = {m["id"]: m for m in data["merchant"]}
 merchweneed = set([])
 
 for tr in data["transaction"]:
-    for tg in tr["tag"]:
-        tagsweneed.add(tg)
-    for mr in tr["merchant"]:
-        merchweneed.add(mr)
+    if tr["tag"]:
+        for tg in tr["tag"]:
+            tagsweneed.add(tg)
+            if tagdict[tg]["parent"]:
+                tagsweneed.add(tagdict[tg]["parent"])
+    if tr["merchant"]:
+        merchweneed.add(tr["merchant"])
 
-for tg in tagsweneed:
-    if tg["parent"]:
-        tagsweneed.add(tg["parent"])
 
 data["tag"] = [tagdict[i] for i in tagsweneed]
 data["merchant"] = [merchdict[i] for i in merchweneed]

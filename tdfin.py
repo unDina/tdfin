@@ -20,8 +20,6 @@ config_name = "tdfin.yaml"
 
 # https://github.com/zenmoney/ZenPlugins/wiki/ZenMoney-API -- правильная дока
 
-config = config_data()
-
 def load_config(path):
     if os.path.exists(path):
         with open(path) as f:
@@ -41,6 +39,8 @@ def config_data():
     if data:
         return data
     raise Exception("No config found")
+
+config = config_data()
 
 def oauthorize():
     "Получить объект oauth с новым токеном"
