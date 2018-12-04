@@ -15,6 +15,24 @@ userid = tdfin.config["userid"]
 with open(tdfin.config["plus_dump_in"]) as f:
     data = json.load(f)
 
+# Проверяем, какие теги и мерчанты есть в транзакциях, и оставляем в дампе только их
+tagdict = {t["id"]: t for t in data["tag"]}
+tagsweneed = set([])
+merchdict = {m["id"]: m for m in data["merchant"]}
+merchweneed = set([])
+
+for tr in data["transaction"]:
+    for tg in tr["tag"]:
+        tagsweneed.add(tg)
+    for mr in tr["merchant"]:
+        merchweneed.add(mr)
+
+for tg in tagsweneed:
+    if tg["parent"]:
+        tagsweneed.add(tg["parent"])
+
+data["tag"] = [tagdict[i] for i in tagsweneed]
+data["merchant"] = [merchdict[i] for i in merchweneed]
 
 # создаём новые id аккаунтам, тэгам, мерчантам и транзакциям, меняем их во всех ссылках, меняем юзеров
 debtid = None
