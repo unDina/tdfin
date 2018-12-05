@@ -10,6 +10,11 @@ def replace_date(timestamp):
     # createdDate                      2017-07-13 11:49:43
     return int(dt.strptime(timestamp, "%Y-%m-%d %H:%M:%S").strftime("%s"))
 
+def replace_double(value):
+    if isinstance(value, basestring):
+        value.replace(",", ".")
+    return float(value)
+
 def replace_instrument(shorttitle, data):
     for instrument in data["instrument"]:
         if instrument["shortTitle"] == shorttitle: return instrument["id"]
@@ -165,7 +170,7 @@ for i, line in csv_data.iterrows():
             "incomeInstrument": replace_instrument(line["incomeCurrencyShortTitle"], data), 
             "outcomeBankID": None, 
             "opIncomeInstrument": None, 
-            "income": line["income"], 
+            "income": replace_double(line["income"]), 
             "qrCode": None, 
             "reminderMarker": None, 
             "originalPayee": line["payee"], 
@@ -181,7 +186,7 @@ for i, line in csv_data.iterrows():
             "changed": changed_ts, 
             "longitude": None, 
             "payee": line["payee"], 
-            "outcome": line["outcome"], 
+            "outcome": replace_double(line["outcome"]), 
             "outcomeInstrument": replace_instrument(line["outcomeCurrencyShortTitle"], data)
         })
         known_trans.add((created_ts, changed_ts, line["income"], line["outcome"]))
