@@ -4,23 +4,39 @@ import tdfin
 import os
 import json
 import pandas as pd
+import sys
 from datetime import datetime as dt
+
+def check_and_propagate(a, b, name):
+    if a is None and b is None:
+        raise Exception("Both transaction {} are missing".format(name))
+    if a is None:
+        a = b
+    if b is None:
+        b = a
+    return a, b
 
 def replace_date(timestamp):
     # createdDate                      2017-07-13 11:49:43
     return int(dt.strptime(timestamp, "%Y-%m-%d %H:%M:%S").strftime("%s"))
 
 def replace_double(value):
+    if value is None:
+        return 0
     if isinstance(value, basestring):
-        value.replace(",", ".")
+        value = value.replace(",", ".")
     return float(value)
 
 def replace_instrument(shorttitle, data):
+    if shorttitle is None:
+        return None
     for instrument in data["instrument"]:
         if instrument["shortTitle"] == shorttitle: return instrument["id"]
     raise Exception("Unknown shortTitle of instrument {}".format(shorttitle))
 
 def replace_account(acname, data):
+    if acname is None:
+        return None
     for account in data["account"]:
         if account["title"] == acname:
             return account["id"]
@@ -118,9 +134,9 @@ def replace_tag(tagname, ts, data, newtags):
 data = tdfin.get_dump()
 
 # загружаем csv
-csv_data = pd.read_csv(tdfin.config["csv_to_diff_in"], encoding="utf-8")
+csv_data = pd.read_csv(tdfin.config["csv_to_diff_in"], header = tdfin.config["csv_to_diff_header"], encoding="utf-8")
 
-## Пример строчки из файла
+## Пример строчки из файла с дампом из телефона
 # date                                      2017-07-13
 # categoryName                          Еда / Продукты
 # payee                            MAGAZIN  N1, MOSCOW
@@ -133,7 +149,7 @@ csv_data = pd.read_csv(tdfin.config["csv_to_diff_in"], encoding="utf-8")
 # incomeCurrencyShortTitle                         RUB
 # createdDate                      2017-07-13 11:49:43
 # changedDate                      2018-06-24 16:38:21
-
+## В csv с сайта отличие в формате income/outcome (там "," в качестве плавающей точки)
 
 # создаём список транзакций по загруженному csv
 transactions = []
@@ -152,47 +168,64 @@ known_trans = set([(t["created"], t["changed"], t["income"], t["outcome"]) for t
 
 # обрабатываем транзакции из csv 
 for i, line in csv_data.iterrows():
-    created_ts = replace_date(line["createdDate"])
-    changed_ts = replace_date(line["changedDate"])
-    # проверка на дубли
-    if (created_ts, changed_ts, line["income"], line["outcome"]) in known_trans :
-        raise Exception("Duplicate:\n{}".format(str(line)))
-    else:
-        transactions.append({
-            "comment": line["comment"], 
-            "opOutcomeInstrument": None, 
-            "tag": replace_tag(line["categoryName"], created_ts, data, tags), 
-            "opOutcome": None, 
-            "outcomeAccount": replace_account(line["outcomeAccountName"], data), 
-            "id": tdfin.newid(), 
-            "incomeAccount": replace_account(line["incomeAccountName"], data), 
-            "incomeBankID": None, 
-            "incomeInstrument": replace_instrument(line["incomeCurrencyShortTitle"], data), 
-            "outcomeBankID": None, 
-            "opIncomeInstrument": None, 
-            "income": replace_double(line["income"]), 
-            "qrCode": None, 
-            "reminderMarker": None, 
-            "originalPayee": line["payee"], 
-            "merchant": replace_merchant(line["payee"], created_ts, data, merchants), 
-            "deleted": False, 
-            "latitude": None, 
-            "user": tdfin.config["userid"], 
-            "date": line["date"], 
-            "hold": None,  # Предположительно, когда транзакция автоматически распозналась с смски, это поле True,
-            # но мы решили пока везде поставить None 
-            "opIncome": None, 
-            "created": created_ts, 
-            "changed": changed_ts, 
-            "longitude": None, 
-            "payee": line["payee"], 
-            "outcome": replace_double(line["outcome"]), 
-            "outcomeInstrument": replace_instrument(line["outcomeCurrencyShortTitle"], data)
-        })
-        known_trans.add((created_ts, changed_ts, line["income"], line["outcome"]))
-    # много транзакций сразу не пролазят
-    if i > 200: break
-    
+    try:
+        created_ts = replace_date(line["createdDate"])
+        changed_ts = replace_date(line["changedDate"])
+        income_account = replace_account(line["incomeAccountName"], data)
+        outcome_account = replace_account(line["outcomeAccountName"], data)
+        income_instrument = replace_instrument(line["incomeCurrencyShortTitle"], data)
+        outcome_instrument = replace_instrument(line["outcomeCurrencyShortTitle"], data) 
+        # проверка на отсутствие обоих аккаунтов транзакциии и дозаполнение
+        income_account, outcome_account = check_and_propagate(income_account, outcome_account, "accounts")
+        # проверка на отстутствие обоих валют и дозаполнение
+        income_instrument, outcome_instrument = check_and_propagate(income_instrument, outcome_instrument, "instruments")
+        # проверка на дубли
+        if (created_ts, changed_ts, line["income"], line["outcome"]) in known_trans :
+            # raise Exception("Duplicate:\n{}".format(str(line)))
+            # print "Duplicate:\n{}".format(str(line))
+            sys.stdout.write(".")
+            sys.stdout.flush()
+        else:
+            transactions.append({
+                "comment": line["comment"], 
+                "opOutcomeInstrument": None, 
+                "tag": replace_tag(line["categoryName"], created_ts, data, tags), 
+                "opOutcome": None, 
+                "outcomeAccount": outcome_account,  
+                "id": tdfin.newid(), 
+                "incomeAccount": income_account, 
+                "incomeBankID": None, 
+                "incomeInstrument": income_instrument, 
+                "outcomeBankID": None, 
+                "opIncomeInstrument": None, 
+                "income": replace_double(line["income"]), 
+                "qrCode": None, 
+                "reminderMarker": None, 
+                "originalPayee": line["payee"], 
+                "merchant": replace_merchant(line["payee"], created_ts, data, merchants), 
+                "deleted": False, 
+                "latitude": None, 
+                "user": tdfin.config["userid"], 
+                "date": line["date"], 
+                "hold": None,  # Предположительно, когда транзакция автоматически распозналась с смски, это поле True,
+                # но мы решили пока везде поставить None 
+                "opIncome": None, 
+                "created": created_ts, 
+                "changed": changed_ts, 
+                "longitude": None, 
+                "payee": line["payee"], 
+                "outcome": replace_double(line["outcome"]), 
+                "outcomeInstrument": outcome_instrument
+            })
+            known_trans.add((created_ts, changed_ts, line["income"], line["outcome"]))
+        # много транзакций сразу не пролазят
+        if len(transactions) > 200: break
+    except:
+        print >> sys.stderr, "line", i
+        raise
+
+print
+
 # кладём в дифф новые транзакции, мерчанты и тэги
 result_data = {"transaction": transactions}
 if merchants:
